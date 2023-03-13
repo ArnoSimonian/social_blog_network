@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Об авторе проекта{% endblock %}
+{% block content %}
+{% load static %}
+<h1>Привет, я автор</h1>
+<p>Тут я размещу информацию о себе, используя свои умения верстать.</p>
+<p>Картинки, блоки, элементы бустрап. А может быть, просто напишу несколько абзацев текста.</p>
+<p><a href="https://github.com/ArnoSimonian/">Мое портфолио на github</a></p>
+<div class="container">
+  <img src="{% static 'img/workspace.jpg' %}" width="833" height="500">
+</div>
+{% endblock %}
