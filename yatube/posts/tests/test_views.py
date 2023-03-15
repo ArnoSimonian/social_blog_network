@@ -51,7 +51,7 @@ class PostPagesTests(TestCase):
         )
         cls.post = Post.objects.create(
             author=cls.user_author,
-            created=timezone.now(),
+            pub_date=timezone.now(),
             group=cls.group,
             text='Тестовый пост',
             image=cls.uploaded,
@@ -91,7 +91,7 @@ class PostPagesTests(TestCase):
     def check_posts_have_expected_fields(self, post):
         """Все посты формируются с ожидаемыми полями."""
         self.assertEqual(post.author.username, self.post.author.username)
-        self.assertEqual(post.created, self.post.created)
+        self.assertEqual(post.pub_date, self.post.pub_date)
         self.assertEqual(post.group.title, self.post.group.title)
         self.assertEqual(post.text, self.post.text)
         self.assertEqual(post.image, self.post.image)
@@ -184,7 +184,7 @@ class FollowViewsTests(TestCase):
         )
         cls.post = Post.objects.create(
             author=cls.user_author,
-            created=timezone.now(),
+            pub_date=timezone.now(),
             group=cls.group,
             text='Тестовый пост',
         )
@@ -265,7 +265,7 @@ class PaginatorViewsTests(TestCase):
         )
         cls.post = Post.objects.create(
             author=cls.user_author,
-            created=timezone.now(),
+            pub_date=timezone.now(),
             group=cls.group,
             text='Тестовый пост',
         )
@@ -288,7 +288,7 @@ class PaginatorViewsTests(TestCase):
             Post.objects.bulk_create([
                 Post(
                     author=self.user_author,
-                    created=timezone.now(),
+                    pub_date=timezone.now(),
                     group=self.group,
                     text='Тестовый пост' + str(post_num),
                 ),

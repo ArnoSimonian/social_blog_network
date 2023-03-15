@@ -41,7 +41,7 @@ class PostFormTests(TestCase):
         )
         cls.post = Post.objects.create(
             author=cls.user_author,
-            created=timezone.now(),
+            pub_date=timezone.now(),
             group=cls.group,
             text='Тестовый пост',
             image=cls.uploaded

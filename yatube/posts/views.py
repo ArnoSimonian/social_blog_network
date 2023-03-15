@@ -59,10 +59,9 @@ def post_detail(request, post_id):
     post = get_object_or_404(Post.objects.select_related('author', 'group'),
                              pk=post_id)
     comments = post.comments.select_related('author')
-    form = CommentForm(None)
     context = {
         'post': post,
-        'form': form,
+        'form': CommentForm(),
         'comments': comments
     }
     return render(request, template, context)
