@@ -2,7 +2,6 @@ from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404, redirect, render
-from django.views.decorators.cache import cache_page
 
 from .forms import CommentForm, PostForm
 from .models import Follow, Group, Post, User
@@ -13,14 +12,13 @@ def paginate(page_number, post_list, posts_on_the_page_num):
     return paginator.get_page(page_number)
 
 
-@cache_page(20, key_prefix='index_page')
 def index(request):
     template = 'posts/index.html'
     post_list = Post.objects.select_related('author', 'group')
-    posts_on_the_page_num = settings.POSTS_ON_THE_PAGE_NUM
-    page_number = request.GET.get('page')
     context = {
-        'page_obj': paginate(page_number, post_list, posts_on_the_page_num),
+        'page_obj': paginate(request.GET.get('page'),
+                             post_list,
+                             settings.POSTS_ON_THE_PAGE_NUM),
     }
     return render(request, template, context)
 
@@ -29,11 +27,11 @@ def group_posts(request, slug):
     template = 'posts/group_list.html'
     group = get_object_or_404(Group, slug=slug)
     post_list = group.posts.select_related('author')
-    posts_on_the_page_num = settings.POSTS_ON_THE_PAGE_NUM
-    page_number = request.GET.get('page')
     context = {
         'group': group,
-        'page_obj': paginate(page_number, post_list, posts_on_the_page_num),
+        'page_obj': paginate(request.GET.get('page'),
+                             post_list,
+                             settings.POSTS_ON_THE_PAGE_NUM),
     }
     return render(request, template, context)
 
@@ -46,12 +44,12 @@ def profile(request, username):
         request.user.is_authenticated
         and author.following.filter(user=request.user).exists()
     )
-    posts_on_the_page_num = settings.POSTS_ON_THE_PAGE_NUM
-    page_number = request.GET.get('page')
     context = {
         'author': author,
         'following': following,
-        'page_obj': paginate(page_number, post_list, posts_on_the_page_num),
+        'page_obj': paginate(request.GET.get('page'),
+                             post_list,
+                             settings.POSTS_ON_THE_PAGE_NUM),
     }
     return render(request, template, context)
 
@@ -60,10 +58,8 @@ def post_detail(request, post_id):
     template = 'posts/post_detail.html'
     post = get_object_or_404(Post.objects.select_related('author', 'group'),
                              pk=post_id)
-    comments = post.comments.select_related('author', 'post')
-    form = CommentForm(
-        request.POST or None
-    )
+    comments = post.comments.select_related('author')
+    form = CommentForm(None)
     context = {
         'post': post,
         'form': form,
@@ -111,8 +107,7 @@ def post_edit(request, post_id):
 
 @login_required
 def add_comment(request, post_id):
-    post = get_object_or_404(Post.objects.select_related('author', 'group'),
-                             pk=post_id)
+    post = get_object_or_404(Post, pk=post_id)
     form = CommentForm(request.POST or None)
     if form.is_valid():
         comment = form.save(commit=False)
@@ -127,10 +122,10 @@ def follow_index(request):
     template = 'posts/follow.html'
     post_list = Post.objects.select_related('author', 'group').filter(
         author__following__user=request.user)
-    posts_on_the_page_num = settings.POSTS_ON_THE_PAGE_NUM
-    page_number = request.GET.get('page')
     context = {
-        'page_obj': paginate(page_number, post_list, posts_on_the_page_num),
+        'page_obj': paginate(request.GET.get('page'),
+                             post_list,
+                             settings.POSTS_ON_THE_PAGE_NUM),
         'follow': True,
     }
     return render(request, template, context)

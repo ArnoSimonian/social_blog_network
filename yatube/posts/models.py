@@ -1,6 +1,7 @@
-from core.models import CreatedModel
 from django.contrib.auth import get_user_model
 from django.db import models
+
+from core.models import CreatedModel
 
 User = get_user_model()
 
@@ -56,7 +57,7 @@ class Post(CreatedModel):
     )
 
     class Meta:
-        ordering = ('-pub_date',)
+        ordering = ('-created',)
         verbose_name = 'Пост'
         verbose_name_plural = 'Посты'
 
@@ -104,3 +105,13 @@ class Follow(models.Model):
         verbose_name="Автор постов",
         help_text="Автор постов с подписками"
     )
+
+    class Meta:
+        verbose_name = 'Подписка'
+        verbose_name_plural = 'Подписки'
+        constraints = [
+            models.CheckConstraint(check=~models.Q(author=models.F('user')),
+                                   name='could_not_follow_itself'),
+            models.UniqueConstraint(fields=['user', 'author'],
+                                    name='unique_following'),
+        ]

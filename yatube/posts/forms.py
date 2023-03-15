@@ -11,8 +11,6 @@ class PostForm(forms.ModelForm):
             required=True,
             widget=forms.Textarea,
         )
-        group = forms.ChoiceField(required=False)
-        image = forms.ImageField()
 
 
 class CommentForm(forms.ModelForm):

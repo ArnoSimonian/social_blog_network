@@ -24,8 +24,10 @@ class PostPagesTests(TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.user_auth = User.objects.create_user(username='TestAuthUser')
         cls.user_author = User.objects.create_user(username='TestAuthor')
+        cls.user_follower = User.objects.create_user(
+            username='TestUserFollower'
+        )
         cls.group = Group.objects.create(
             title='Тестовая группа',
             slug='test-slug',
@@ -49,10 +51,14 @@ class PostPagesTests(TestCase):
         )
         cls.post = Post.objects.create(
             author=cls.user_author,
-            pub_date=timezone.now(),
+            created=timezone.now(),
             group=cls.group,
             text='Тестовый пост',
             image=cls.uploaded,
+        )
+        cls.follow_case = Follow.objects.create(
+            user=cls.user_follower,
+            author=cls.user_author
         )
 
         cls.reverse_names_post_list_context = (
@@ -60,6 +66,7 @@ class PostPagesTests(TestCase):
             reverse('posts:group_list', kwargs={'slug': cls.post.group.slug}),
             reverse('posts:profile',
                     kwargs={'username': cls.post.author.username}),
+            reverse('posts:follow_index'),
         )
 
         cls.reverse_names_objects = [
@@ -79,20 +86,21 @@ class PostPagesTests(TestCase):
         cache.clear()
         self.guest_client = Client()
         self.authorized_client = Client()
-        self.authorized_client.force_login(PostPagesTests.user_auth)
+        self.authorized_client.force_login(PostPagesTests.user_author)
 
     def check_posts_have_expected_fields(self, post):
         """Все посты формируются с ожидаемыми полями."""
         self.assertEqual(post.author.username, self.post.author.username)
-        self.assertEqual(post.pub_date, self.post.pub_date)
+        self.assertEqual(post.created, self.post.created)
         self.assertEqual(post.group.title, self.post.group.title)
         self.assertEqual(post.text, self.post.text)
         self.assertEqual(post.image, self.post.image)
 
     def test_page_with_post_lists_show_correct_context(self):
-        """Шаблоны index, group_list и profile сформированы
+        """Шаблоны index, group_list, profile и follow сформированы
         с правильным контекстом.
         """
+        self.authorized_client.force_login(PostPagesTests.user_follower)
         for reverse_name in self.reverse_names_post_list_context:
             with self.subTest(reverse_name=reverse_name):
                 response = self.authorized_client.get(reverse_name)
@@ -112,8 +120,6 @@ class PostPagesTests(TestCase):
         response = self.guest_client.get(
             reverse('posts:post_detail', kwargs={'post_id': self.post.pk}))
         self.check_posts_have_expected_fields(response.context['post'])
-        self.assertEqual(response.context.get('post'), self.post)
-        self.assertEqual(response.context.get('post').image, self.post.image)
 
     def test_create_post_page_show_correct_context(self):
         """Шаблон create_post сформирован с правильным контекстом."""
@@ -123,7 +129,6 @@ class PostPagesTests(TestCase):
 
     def test_edit_post_page_show_correct_context(self):
         """Шаблон edit_post сформирован с правильным контекстом."""
-        self.authorized_client.force_login(PostPagesTests.user_author)
         response = self.authorized_client.get(
             reverse('posts:post_edit', kwargs={'post_id': self.post.pk}))
         form = response.context.get('form')
@@ -171,7 +176,6 @@ class FollowViewsTests(TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.user_auth = User.objects.create_user(username='TestAuthUser')
         cls.user_author = User.objects.create_user(username='TestAuthor')
         cls.user_follower = User.objects.create_user(username='TestFollower')
         cls.group = Group.objects.create(
@@ -180,7 +184,7 @@ class FollowViewsTests(TestCase):
         )
         cls.post = Post.objects.create(
             author=cls.user_author,
-            pub_date=timezone.now(),
+            created=timezone.now(),
             group=cls.group,
             text='Тестовый пост',
         )
@@ -194,26 +198,32 @@ class FollowViewsTests(TestCase):
         self.authorized_client = Client()
         self.authorized_client.force_login(FollowViewsTests.user_follower)
 
-    def test_auth_user_can_follow_and_unfollow(self):
+    def test_auth_user_can_follow_other_users(self):
         """Авторизованный пользователь может подписываться
-        на других пользователей и удалять их из подписок.
+        на других пользователей.
         """
         Follow.objects.all().delete()
         self.authorized_client.post(reverse(
             'posts:profile_follow',
             kwargs={'username': self.post.author.username}))
         self.assertTrue(
-            Follow.objects.select_related('author', 'group').filter(
+            Follow.objects.select_related('author', 'user').filter(
                 user=self.user_follower,
                 author=self.user_author
             ).exists()
         )
         self.assertEqual(Follow.objects.count(), 1)
+
+    def test_auth_user_can_unfollow_other_users(self):
+        """Авторизованный пользователь может удалять
+        других пользователей из подписок.
+        """
+        self.follow_case
         self.authorized_client.post(reverse(
             'posts:profile_unfollow',
             kwargs={'username': self.post.author.username}))
         self.assertFalse(
-            Follow.objects.select_related('author', 'group').filter(
+            Follow.objects.select_related('author', 'user').filter(
                 user=self.user_follower,
                 author=self.user_author
             ).exists()
@@ -221,15 +231,24 @@ class FollowViewsTests(TestCase):
         self.assertEqual(Follow.objects.count(), 0)
 
     def test_new_post_is_in_follower_list_and_not_in_not_follower(self):
-        """Новая запись пользователя появляется в ленте тех, кто
-        на него подписан, и не появляется в ленте тех, кто не подписан.
+        """Новая запись пользователя не появляется в ленте тех,
+        кто на него не подписан.
         """
-        self.follow_case
-        response = self.authorized_client.get(reverse('posts:follow_index'))
-        self.assertIn(self.post, response.context['page_obj'])
         Follow.objects.all().delete()
         response = self.authorized_client.get(reverse('posts:follow_index'))
         self.assertNotIn(self.post, response.context['page_obj'])
+
+    def test_user_cant_follow_itself(self):
+        """Подписка на самого себя невозможна."""
+        self.authorized_client.post(reverse(
+            'posts:profile_follow',
+            kwargs={'username': self.post.author.username}))
+        self.assertFalse(
+            Follow.objects.select_related('author', 'user').filter(
+                user=self.user_author,
+                author=self.user_author
+            ).exists()
+        )
 
 
 class PaginatorViewsTests(TestCase):
@@ -246,7 +265,7 @@ class PaginatorViewsTests(TestCase):
         )
         cls.post = Post.objects.create(
             author=cls.user_author,
-            pub_date=timezone.now(),
+            created=timezone.now(),
             group=cls.group,
             text='Тестовый пост',
         )
@@ -269,7 +288,7 @@ class PaginatorViewsTests(TestCase):
             Post.objects.bulk_create([
                 Post(
                     author=self.user_author,
-                    pub_date=timezone.now(),
+                    created=timezone.now(),
                     group=self.group,
                     text='Тестовый пост' + str(post_num),
                 ),
